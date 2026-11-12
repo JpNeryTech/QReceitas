@@ -1,98 +1,241 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches"];
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+// NOVO: dados de exemplo (depois vão vir do Firebase)
+const RECEITAS = [
+  {
+    id: "1",
+    titulo: "Bolo de cenoura",
+    tempo: "50 min",
+    categoria: "Sobremesas",
+    cor: "#F3E3C8",
+  },
+  {
+    id: "2",
+    titulo: "Lasanha",
+    tempo: "1 h 20",
+    categoria: "Massas",
+    cor: "#F0D9D2",
+  },
+  {
+    id: "3",
+    titulo: "Salada Caesar",
+    tempo: "20 min",
+    categoria: "Saladas",
+    cor: "#E2ECD8",
+  },
+  {
+    id: "4",
+    titulo: "Brigadeiro",
+    tempo: "30 min",
+    categoria: "Sobremesas",
+    cor: "#E6DDEE",
+  },
+  {
+    id: "5",
+    titulo: "Pão de queijo",
+    tempo: "45 min",
+    categoria: "Lanches",
+    cor: "#EFE6BF",
+  },
+  {
+    id: "6",
+    titulo: "Macarrão alho e óleo",
+    tempo: "25 min",
+    categoria: "Massas",
+    cor: "#DDE7EC",
+  },
+];
+
+export default function Index() {
+  const [busca, setBusca] = useState("");
+  const [categoria, setCategoria] = useState("Todas");
+
+  // NOVO: calcula a largura de cada card (2 por linha)
+  const { width } = useWindowDimensions();
+  const larguraCard = (width - 40 - 12) / 2; // 40 = padding da tela, 12 = espaço entre cards
+
+  // NOVO: filtra as receitas pela categoria e pela busca
+  const receitasFiltradas = RECEITAS.filter((receita) => {
+    const bateCategoria =
+      categoria === "Todas" || receita.categoria === categoria;
+    const bateBusca = receita.titulo
+      .toLowerCase()
+      .includes(busca.toLowerCase());
+    return bateCategoria && bateBusca;
+  });
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <SafeAreaView style={styles.tela}>
+      <FlatList
+        data={receitasFiltradas}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.linha}
+        contentContainerStyle={styles.lista}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View style={styles.cabecalho}>
+            <Text style={styles.titulo}>Minhas receitas</Text>
+            <Text style={styles.subtitulo}>O que vamos cozinhar hoje?</Text>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+            <TextInput
+              style={styles.busca}
+              placeholder="Buscar por nome ou ingrediente"
+              placeholderTextColor="#5C655E"
+              value={busca}
+              onChangeText={setBusca}
+            />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categorias}
+            >
+              {CATEGORIAS.map((item) => {
+                const selecionada = item === categoria;
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => setCategoria(item)}
+                    style={[styles.chip, selecionada && styles.chipSelecionado]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipTexto,
+                        selecionada && styles.chipTextoSelecionado,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        }
+        ListEmptyComponent={
+          <Text style={styles.vazio}>Nenhuma receita encontrada.</Text>
+        }
+        renderItem={({ item }) => (
+          <View style={[styles.card, { width: larguraCard }]}>
+            <View style={[styles.foto, { backgroundColor: item.cor }]} />
+            <View style={styles.cardInfo}>
+              <Text style={styles.cardTitulo} numberOfLines={2}>
+                {item.titulo}
+              </Text>
+              <Text style={styles.cardMeta}>
+                {item.tempo} · {item.categoria}
+              </Text>
+            </View>
+          </View>
+        )}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  tela: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: "#F7F8F5",
   },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+  lista: {
+    padding: 20,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  cabecalho: {
+    gap: 16,
+    marginBottom: 16,
   },
-  title: {
-    textAlign: 'center',
+  titulo: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1B1F1C",
   },
-  code: {
-    textTransform: 'uppercase',
+  subtitulo: {
+    fontSize: 15,
+    color: "#5C655E",
+    marginTop: -12,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  busca: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#E1E5DE",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: "#1B1F1C",
+  },
+  categorias: {
+    gap: 8,
+  },
+  chip: {
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E1E5DE",
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+  },
+  chipSelecionado: {
+    backgroundColor: "#2F7D4F",
+    borderColor: "#2F7D4F",
+  },
+  chipTexto: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1B1F1C",
+  },
+  chipTextoSelecionado: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  // NOVO: estilos da grade e dos cards
+  linha: {
+    gap: 12,
+    marginBottom: 12,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E1E5DE",
+    overflow: "hidden",
+  },
+  foto: {
+    height: 120,
+  },
+  cardInfo: {
+    padding: 12,
+    gap: 6,
+  },
+  cardTitulo: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1B1F1C",
+  },
+  cardMeta: {
+    fontSize: 13,
+    color: "#5C655E",
+  },
+  vazio: {
+    textAlign: "center",
+    color: "#5C655E",
+    fontSize: 15,
+    marginTop: 24,
   },
 });

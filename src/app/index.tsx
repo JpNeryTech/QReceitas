@@ -9,55 +9,13 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { Image } from "expo-image";
+import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches"];
+import { RECEITAS } from "../data/receitas";
 
-// NOVO: dados de exemplo (depois vão vir do Firebase)
-const RECEITAS = [
-  {
-    id: "1",
-    titulo: "Bolo de cenoura",
-    tempo: "50 min",
-    categoria: "Sobremesas",
-    cor: "#F3E3C8",
-  },
-  {
-    id: "2",
-    titulo: "Lasanha",
-    tempo: "1 h 20",
-    categoria: "Massas",
-    cor: "#F0D9D2",
-  },
-  {
-    id: "3",
-    titulo: "Salada Caesar",
-    tempo: "20 min",
-    categoria: "Saladas",
-    cor: "#E2ECD8",
-  },
-  {
-    id: "4",
-    titulo: "Brigadeiro",
-    tempo: "30 min",
-    categoria: "Sobremesas",
-    cor: "#E6DDEE",
-  },
-  {
-    id: "5",
-    titulo: "Pão de queijo",
-    tempo: "45 min",
-    categoria: "Lanches",
-    cor: "#EFE6BF",
-  },
-  {
-    id: "6",
-    titulo: "Macarrão alho e óleo",
-    tempo: "25 min",
-    categoria: "Massas",
-    cor: "#DDE7EC",
-  },
-];
+const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches"];
 
 export default function Index() {
   const [busca, setBusca] = useState("");
@@ -130,8 +88,31 @@ export default function Index() {
           <Text style={styles.vazio}>Nenhuma receita encontrada.</Text>
         }
         renderItem={({ item }) => (
-          <View style={[styles.card, { width: larguraCard }]}>
-            <View style={[styles.foto, { backgroundColor: item.cor }]} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Abrir receita ${item.titulo}`}
+            onPress={() =>
+              router.push({
+                pathname: "/receita/[id]",
+                params: { id: item.id },
+              })
+            }
+            style={({ pressed }) => [
+              styles.card,
+              { width: larguraCard },
+              pressed && styles.cardPressionado,
+            ]}
+          >
+            <View style={[styles.foto, { backgroundColor: item.cor }]}>
+              {item.imagem ? (
+                <Image
+                  source={item.imagem}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  accessibilityLabel={`Foto de ${item.titulo}`}
+                />
+              ) : null}
+            </View>
             <View style={styles.cardInfo}>
               <Text style={styles.cardTitulo} numberOfLines={2}>
                 {item.titulo}
@@ -140,7 +121,7 @@ export default function Index() {
                 {item.tempo} · {item.categoria}
               </Text>
             </View>
-          </View>
+          </Pressable>
         )}
       />
     </SafeAreaView>
@@ -215,6 +196,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E1E5DE",
     overflow: "hidden",
+  },
+  cardPressionado: {
+    opacity: 0.85,
   },
   foto: {
     height: 120,

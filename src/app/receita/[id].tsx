@@ -17,6 +17,7 @@ const COR_TEXTO = "#1B1F1C";
 const COR_SUAVE = "#5C655E";
 const COR_VERDE = "#2F7D4F";
 const COR_BORDA = "#E1E5DE";
+const COR_DELETAR = "#C44536";
 
 function formatarPorcoes(quantidade: number) {
   return quantidade === 1 ? "1 porção" : `${quantidade} porções`;
@@ -158,6 +159,31 @@ export default function Receita() {
               </View>
             ))}
           </View>
+
+          <View style={styles.acoes}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Editar receita"
+              onPress={() => {}}
+              style={({ pressed }) => [
+                styles.botaoEditar,
+                pressed && styles.botaoPressionado,
+              ]}
+            >
+              <Text style={styles.botaoEditarTexto}>Editar</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Deletar receita"
+              onPress={() => {}}
+              style={({ pressed }) => [
+                styles.botaoDeletar,
+                pressed && styles.botaoPressionado,
+              ]}
+            >
+              <Text style={styles.botaoDeletarTexto}>Deletar</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -296,6 +322,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: COR_TEXTO,
+  },
+  acoes: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  botaoEditar: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COR_BORDA,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  botaoDeletar: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COR_DELETAR,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  botaoEditarTexto: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COR_TEXTO,
+  },
+  botaoDeletarTexto: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  botaoPressionado: {
+    opacity: 0.85,
   },
   naoEncontrada: {
     marginTop: 24,

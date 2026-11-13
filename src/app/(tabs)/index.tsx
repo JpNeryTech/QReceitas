@@ -13,7 +13,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { RECEITAS } from "../data/receitas";
+import { RECEITAS } from "../../data/receitas";
 
 const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches"];
 
@@ -36,7 +36,7 @@ export default function Index() {
   });
 
   return (
-    <SafeAreaView style={styles.tela}>
+    <SafeAreaView style={styles.tela} edges={["top", "left", "right"]}>
       <FlatList
         data={receitasFiltradas}
         keyExtractor={(item) => item.id}

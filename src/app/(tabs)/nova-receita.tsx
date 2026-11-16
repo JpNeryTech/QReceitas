@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
   Text,
   TextInput,
   View,
+  type TextInputFocusEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -67,6 +69,17 @@ export default function NovaReceita() {
   const [fotoSalva, setFotoSalva] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [carregandoEdicao, setCarregandoEdicao] = useState(editando);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+
+  function subirCampo(evento: TextInputFocusEvent) {
+    if (typeof evento.target !== "number") return;
+
+    scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(
+      evento.target,
+      180,
+      true,
+    );
+  }
   const [titulo, setTitulo] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
   const [tempo, setTempo] = useState("");
@@ -305,9 +318,11 @@ export default function NovaReceita() {
         return;
       }
 
+      const nome = receita.titulo;
       await adicionarReceita(receita);
       limparFormulario();
       router.navigate("/");
+      mostrarMensagem("Receita publicada!", `${nome} foi salva com sucesso.`);
     } catch (erro) {
       console.error("Erro ao cadastrar receita:", erro);
       mostrarMensagem(
@@ -331,7 +346,9 @@ export default function NovaReceita() {
 
   return (
     <SafeAreaView style={styles.tela} edges={["top"]}>
+      <KeyboardAvoidingView style={styles.teclado} behavior="padding">
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.conteudo}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
@@ -368,6 +385,7 @@ export default function NovaReceita() {
             placeholder="Ex.: Bolo de cenoura"
             placeholderTextColor="#5C655E"
             value={titulo}
+            onFocus={subirCampo}
             onChangeText={setTitulo}
           />
         </View>
@@ -407,6 +425,7 @@ export default function NovaReceita() {
               placeholderTextColor="#5C655E"
               keyboardType="numeric"
               value={tempo}
+              onFocus={subirCampo}
               onChangeText={setTempo}
             />
           </View>
@@ -418,6 +437,7 @@ export default function NovaReceita() {
               placeholderTextColor="#5C655E"
               keyboardType="numeric"
               value={porcoes}
+              onFocus={subirCampo}
               onChangeText={setPorcoes}
             />
           </View>
@@ -435,6 +455,7 @@ export default function NovaReceita() {
                 placeholderTextColor="#5C655E"
                 accessibilityLabel={`Nome do ingrediente ${indice + 1}`}
                 value={ing.nome}
+                onFocus={subirCampo}
                 onChangeText={(texto) =>
                   atualizarIngrediente(ing.id, "nome", texto)
                 }
@@ -445,6 +466,7 @@ export default function NovaReceita() {
                 placeholderTextColor="#5C655E"
                 accessibilityLabel={`Quantidade do ingrediente ${indice + 1}`}
                 value={ing.quantidade}
+                onFocus={subirCampo}
                 onChangeText={(texto) =>
                   atualizarIngrediente(ing.id, "quantidade", texto)
                 }
@@ -488,6 +510,7 @@ export default function NovaReceita() {
                 multiline
                 textAlignVertical="top"
                 value={passo.texto}
+                onFocus={subirCampo}
                 onChangeText={(texto) => atualizarPasso(passo.id, texto)}
                 editable={!salvando}
               />
@@ -524,6 +547,7 @@ export default function NovaReceita() {
           </Text>
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -532,6 +556,9 @@ const styles = StyleSheet.create({
   tela: {
     flex: 1,
     backgroundColor: "#F7F8F5",
+  },
+  teclado: {
+    flex: 1,
   },
   carregando: {
     flex: 1,

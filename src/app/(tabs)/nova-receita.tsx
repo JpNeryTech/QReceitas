@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +15,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { adicionarReceita } from "../../services/receitaService";
+import {
+  adicionarReceita,
+  atualizarReceita,
+  buscarReceitaFirebase,
+} from "../../services/receitaService";
 import { enviarImagemCloudinary } from "../../services/cloudinaryService";
 
 
@@ -38,6 +43,13 @@ function novoPasso(): Passo {
   return { id: gerarId(), texto: "" };
 }
 
+function extrairMinutos(tempo: string) {
+  const minutos = tempo.match(/(\d+)\s*min/i);
+  if (minutos) return minutos[1];
+  const numero = tempo.match(/\d+/);
+  return numero ? numero[0] : "";
+}
+
 function mostrarMensagem(titulo: string, mensagem: string) {
   if (Platform.OS === "web") {
     if (typeof window !== "undefined") window.alert(`${titulo}\n\n${mensagem}`);
@@ -47,8 +59,14 @@ function mostrarMensagem(titulo: string, mensagem: string) {
 }
 
 export default function NovaReceita() {
+  const { id: idParam } = useLocalSearchParams<{ id?: string | string[] }>();
+  const receitaId = Array.isArray(idParam) ? idParam[0] : idParam;
+  const editando = Boolean(receitaId);
+
   const [foto, setFoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [fotoSalva, setFotoSalva] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [carregandoEdicao, setCarregandoEdicao] = useState(editando);
   const [titulo, setTitulo] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
   const [tempo, setTempo] = useState("");
@@ -65,6 +83,88 @@ export default function NovaReceita() {
     novoPasso(),
     novoPasso(),
   ]);
+
+  function limparFormulario() {
+    setFoto(null);
+    setFotoSalva(null);
+    setTitulo("");
+    setCategoria(CATEGORIAS[0]);
+    setTempo("");
+    setPorcoes("");
+    setIngredientes([
+      novoIngrediente(),
+      novoIngrediente(),
+      novoIngrediente(),
+    ]);
+    setPassos([novoPasso(), novoPasso()]);
+  }
+
+  useEffect(() => {
+    if (!receitaId) {
+      limparFormulario();
+      return;
+    }
+
+    let ativo = true;
+    setCarregandoEdicao(true);
+
+    async function carregarReceita() {
+      try {
+        const receita = await buscarReceitaFirebase(receitaId as string);
+        if (!ativo) return;
+
+        if (!receita) {
+          mostrarMensagem(
+            "Receita não encontrada",
+            "Não foi possível abrir essa receita para edição.",
+          );
+          if (router.canGoBack()) router.back();
+          return;
+        }
+
+        setTitulo(receita.titulo);
+        setCategoria(
+          CATEGORIAS.includes(receita.categoria)
+            ? receita.categoria
+            : CATEGORIAS[0],
+        );
+        setTempo(extrairMinutos(receita.tempo));
+        setPorcoes(String(receita.porcoes));
+        setFoto(null);
+        setFotoSalva(typeof receita.imagem === "string" ? receita.imagem : null);
+        setIngredientes(
+          receita.ingredientes?.length
+            ? receita.ingredientes.map((ingrediente) => ({
+                id: gerarId(),
+                nome: ingrediente.nome,
+                quantidade: ingrediente.quantidade,
+              }))
+            : [novoIngrediente()],
+        );
+        setPassos(
+          receita.passos?.length
+            ? receita.passos.map((texto) => ({ id: gerarId(), texto }))
+            : [novoPasso()],
+        );
+      } catch (erro) {
+        console.error("Erro ao carregar receita para edição:", erro);
+        if (!ativo) return;
+        mostrarMensagem(
+          "Erro ao carregar",
+          "Não foi possível abrir a receita. Verifique sua conexão e as regras do Firestore.",
+        );
+        if (router.canGoBack()) router.back();
+      } finally {
+        if (ativo) setCarregandoEdicao(false);
+      }
+    }
+
+    void carregarReceita();
+
+    return () => {
+      ativo = false;
+    };
+  }, [receitaId]);
 
   async function escolherFoto() {
     if (salvando) return;
@@ -173,8 +273,10 @@ export default function NovaReceita() {
 
     setSalvando(true);
     try {
-      // Primeiro envia a foto ao Cloudinary; depois registra a URL no Firestore.
-      const imagemUrl = foto ? await enviarImagemCloudinary(foto) : undefined;
+      // Foto nova sobe para o Cloudinary. Na edição, a URL já salva permanece.
+      const imagemUrl = foto
+        ? await enviarImagemCloudinary(foto)
+        : (fotoSalva ?? undefined);
 
       const cores: Record<string, string> = {
         Sobremesas: "#F3E3C8",
@@ -194,16 +296,18 @@ export default function NovaReceita() {
         ...(imagemUrl ? { imagem: imagemUrl } : {}),
       };
 
-      const id = await adicionarReceita(receita);
-      setFoto(null);
-      setTitulo("");
-      setCategoria(CATEGORIAS[0]);
-      setTempo("");
-      setPorcoes("");
-      setIngredientes([novoIngrediente(), novoIngrediente(), novoIngrediente()]);
-      setPassos([novoPasso(), novoPasso()]);
+      if (editando && receitaId) {
+        await atualizarReceita(receitaId, receita);
+        router.navigate({
+          pathname: "/receita/[id]",
+          params: { id: receitaId },
+        });
+        return;
+      }
 
-      mostrarMensagem("Receita publicada!", `Receita salva com sucesso. Código: ${id}`);
+      await adicionarReceita(receita);
+      limparFormulario();
+      router.navigate("/");
     } catch (erro) {
       console.error("Erro ao cadastrar receita:", erro);
       mostrarMensagem(
@@ -215,6 +319,16 @@ export default function NovaReceita() {
     }
   }
 
+  if (carregandoEdicao) {
+    return (
+      <SafeAreaView style={styles.carregando} edges={["top"]}>
+        <ActivityIndicator size="large" color="#2F7D4F" />
+      </SafeAreaView>
+    );
+  }
+
+  const uriPreview = foto?.uri ?? fotoSalva;
+
   return (
     <SafeAreaView style={styles.tela} edges={["top"]}>
       <ScrollView
@@ -222,13 +336,15 @@ export default function NovaReceita() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <Text style={styles.titulo}>Nova receita</Text>
+        <Text style={styles.titulo}>
+          {editando ? "Editar receita" : "Nova receita"}
+        </Text>
 
         {/* Foto com pré-visualização */}
         <Pressable style={styles.fotoBotao} onPress={escolherFoto} disabled={salvando}>
-          {foto ? (
+          {uriPreview ? (
             <>
-              <Image source={{ uri: foto.uri }} style={styles.fotoImagem} />
+              <Image source={{ uri: uriPreview }} style={styles.fotoImagem} />
               <View style={styles.fotoTrocar}>
                 <Text style={styles.fotoTrocarTexto}>Trocar foto</Text>
               </View>
@@ -400,7 +516,11 @@ export default function NovaReceita() {
         >
           {salvando && <ActivityIndicator size="small" color="#FFFFFF" />}
           <Text style={styles.botaoSalvarTexto}>
-            {salvando ? "Publicando receita..." : "Salvar receita"}
+            {salvando
+              ? "Salvando..."
+              : editando
+                ? "Salvar alterações"
+                : "Salvar receita"}
           </Text>
         </Pressable>
       </ScrollView>
@@ -411,6 +531,12 @@ export default function NovaReceita() {
 const styles = StyleSheet.create({
   tela: {
     flex: 1,
+    backgroundColor: "#F7F8F5",
+  },
+  carregando: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#F7F8F5",
   },
   conteudo: {

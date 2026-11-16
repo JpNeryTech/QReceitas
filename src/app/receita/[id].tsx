@@ -1,11 +1,12 @@
 
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,12 +17,12 @@ import {
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  buscarReceita,
-  type Receita as ReceitaTipo,
-} from "../../data/receitas";
+import type { Receita as ReceitaTipo } from "../../data/receitas";
 
-import { buscarReceitaFirebase } from "../../services/receitaService";
+import {
+  apagarReceita,
+  buscarReceitaFirebase,
+} from "../../services/receitaService";
 
 // CORES
 const COR_TEXTO = "#1B1F1C";
@@ -47,12 +48,6 @@ export default function Receita() {
     Math.round(height * 0.34)
   );
 
-  // Primeiro procura nas receitas locais
-  const receitaLocal =
-    typeof id === "string"
-      ? buscarReceita(id)
-      : undefined;
-
   // Estado da receita vinda do Firebase
   const [resultadoFirebase, setResultadoFirebase] = useState<{
     id: string;
@@ -64,57 +59,52 @@ export default function Receita() {
     mensagem: string;
   } | null>(null);
 
-  // Busca no Firestore apenas se não encontrar localmente
-  useEffect(() => {
-    if (typeof id !== "string" || receitaLocal) {
-      return;
-    }
+  const [apagando, setApagando] = useState(false);
 
-    let ativo = true;
+  // Recarrega ao voltar da edição.
+  useFocusEffect(
+    useCallback(() => {
+      if (typeof id !== "string") {
+        return;
+      }
 
-    async function carregarReceita() {
-      try {
-        const resultado = await buscarReceitaFirebase(id as string);
+      let ativo = true;
 
-        if (ativo) {
-          setResultadoFirebase({
-            id: id as string,
-            receita: resultado,
-          });
-        }
-      } catch (erro) {
-        console.error(
-          "Erro ao buscar receita no Firebase:",
-          erro
-        );
+      async function carregarReceita() {
+        try {
+          const resultado = await buscarReceitaFirebase(id);
 
-        if (ativo) {
-          setErroFirebase({
-            id: id as string,
-            mensagem:
-              "Não foi possível carregar a receita. Verifique sua conexão e as permissões do Firestore.",
-          });
+          if (ativo) {
+            setResultadoFirebase({
+              id,
+              receita: resultado,
+            });
+          }
+        } catch (erro) {
+          console.error("Erro ao buscar receita no Firebase:", erro);
+
+          if (ativo) {
+            setErroFirebase({
+              id,
+              mensagem:
+                "Não foi possível carregar a receita. Verifique sua conexão e as permissões do Firestore.",
+            });
+          }
         }
       }
-    }
 
-    carregarReceita();
+      void carregarReceita();
 
-    return () => {
-      ativo = false;
-    };
-  }, [id, receitaLocal]);
+      return () => {
+        ativo = false;
+      };
+    }, [id]),
+  );
 
-  // Receita definitiva
   const receita =
-    receitaLocal ??
-    (resultadoFirebase?.id === id
-      ? resultadoFirebase.receita
-      : null);
+    resultadoFirebase?.id === id ? resultadoFirebase.receita : null;
 
-  // Estados de carregamento e erro
   const carregando =
-    !receitaLocal &&
     typeof id === "string" &&
     resultadoFirebase?.id !== id &&
     erroFirebase?.id !== id;
@@ -123,6 +113,53 @@ export default function Receita() {
     erroFirebase?.id === id
       ? erroFirebase.mensagem
       : "Receita não encontrada.";
+
+  function abrirEdicao() {
+    if (!receita || typeof id !== "string" || apagando) {
+      return;
+    }
+
+    router.push({
+      pathname: "/nova-receita",
+      params: { id },
+    });
+  }
+
+  function confirmarExclusao() {
+    if (!receita || typeof id !== "string" || apagando) {
+      return;
+    }
+
+    Alert.alert(
+      "Apagar receita",
+      `Deseja apagar "${receita.titulo}"? Essa ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Deletar",
+          style: "destructive",
+          onPress: () => {
+            void excluirReceita(id);
+          },
+        },
+      ],
+    );
+  }
+
+  async function excluirReceita(receitaId: string) {
+    try {
+      setApagando(true);
+      await apagarReceita(receitaId);
+      router.back();
+    } catch (erro) {
+      console.error("Erro ao apagar receita:", erro);
+      setApagando(false);
+      Alert.alert(
+        "Erro ao apagar",
+        "Não foi possível apagar a receita. Verifique sua conexão e as regras do Firestore.",
+      );
+    }
+  }
 
   // Botão de voltar reutilizável
   function BotaoVoltar() {
@@ -353,8 +390,12 @@ export default function Receita() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Editar receita"
-              disabled
-              style={styles.botaoEditar}
+              disabled={apagando}
+              onPress={abrirEdicao}
+              style={({ pressed }) => [
+                styles.botaoEditar,
+                pressed && styles.botaoPressionado,
+              ]}
             >
               <Text style={styles.botaoEditarTexto}>
                 Editar
@@ -364,11 +405,15 @@ export default function Receita() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Deletar receita"
-              disabled
-              style={styles.botaoDeletar}
+              disabled={apagando}
+              onPress={confirmarExclusao}
+              style={({ pressed }) => [
+                styles.botaoDeletar,
+                (pressed || apagando) && styles.botaoPressionado,
+              ]}
             >
               <Text style={styles.botaoDeletarTexto}>
-                Deletar
+                {apagando ? "Apagando..." : "Deletar"}
               </Text>
             </Pressable>
           </View>
@@ -558,7 +603,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    opacity: 0.5,
   },
 
   botaoDeletar: {
@@ -568,7 +612,9 @@ const styles = StyleSheet.create({
     backgroundColor: COR_DELETAR,
     alignItems: "center",
     justifyContent: "center",
-    opacity: 0.5,
+  },
+  botaoPressionado: {
+    opacity: 0.85,
   },
 
   botaoEditarTexto: {

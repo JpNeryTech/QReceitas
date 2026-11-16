@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { router, Tabs } from "expo-router";
 
 export default function TabsLayout() {
   return (
@@ -26,6 +26,15 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="nova-receita"
+        listeners={{
+          tabPress: (evento) => {
+            evento.preventDefault();
+            router.navigate({
+              pathname: "/nova-receita",
+              params: { id: "" },
+            });
+          },
+        }}
         options={{
           title: "Nova receita",
           tabBarIcon: ({ color, size }) => (

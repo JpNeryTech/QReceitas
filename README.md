@@ -1,56 +1,92 @@
-# Welcome to your Expo app 👋
+# 🍲 QReceitas
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicativo mobile para **cadastrar receitas próprias** e **consultar receitas já cadastradas**, com busca simples e visualização completa de ingredientes e modo de preparo.
 
-## Get started
+---
 
-1. Install dependencies
+## ✨ Funcionalidades
 
-   ```bash
-   npm install
-   ```
+- Cadastrar novas receitas (nome, ingredientes, modo de preparo, tempo, porções e categoria)
+- Listar todas as receitas cadastradas
+- Consultar os detalhes de uma receita
+- Buscar receitas por nome ou ingrediente
+- Editar e excluir receitas
 
-2. Start the app
 
-   ```bash
-   npx expo start
-   ```
+## 📁 Estrutura do projeto
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+QReceitas/
+├── assets/          # Imagens, ícones e fontes
+├── src/             # Código-fonte do app (telas, componentes, serviços)
+├── app.json         # Configuração do Expo
+├── package.json     # Dependências e scripts
+├── tsconfig.json    # Configuração do TypeScript
+├── LICENSE
+└── README.md
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## 🚀 Como executar
 
-### Other setup steps
+### Pré-requisitos
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- [Git](https://git-scm.com/)
+- App **Expo Go** no celular (ou um emulador Android/iOS)
 
-## Learn more
+### Passo a passo
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+# 1. Clone o repositório
+git clone [URL-DO-REPOSITORIO]
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# 2. Entre na pasta do projeto
+cd QReceitas
 
-## Join the community
+# 3. Instale as dependências
+npm install
 
-Join our community of developers creating universal apps.
+# 4. Inicie o projeto
+npx expo start
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Depois, escaneie o QR Code com o Expo Go ou pressione `a` (Android) / `i` (iOS) para abrir no emulador.
+
+## 📖 Como usar
+
+1. Na tela inicial, veja a lista de receitas cadastradas.
+2. Use a busca para encontrar uma receita por nome ou ingrediente.
+3. Toque em uma receita para ver ingredientes e modo de preparo.
+4. Use o botão de adicionar para cadastrar a sua própria receita.
+
+## 🧾 Modelo de uma receita
+
+```ts
+type Receita = {
+  id: string;
+  nome: string;
+  categoria: string;
+  tempoPreparo: string;
+  porcoes: number;
+  ingredientes: string[];
+  modoPreparo: string;
+};
+```
+
+## 🗺️ Melhorias futuras
+
+- [ ] Foto da receita
+- [ ] Filtro por categoria e tempo de preparo
+- [ ] Favoritar receitas
+- [ ] Compartilhar receitas
+
+## 👨‍💻 Autor
+
+**Ericson Nascimento **
+**Joao Pedro Nery **
+**Guilherme França fernandes **
+**Gabriella Rocha R. **
+**Artur Tome **
+
+## 📄 Licença
+
+Este projeto está sob a licença descrita no arquivo [LICENSE](./LICENSE).

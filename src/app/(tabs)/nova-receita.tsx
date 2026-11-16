@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -12,7 +14,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { adicionarReceita } from "../../services/receitaService";
+import {
+  adicionarReceita,
+  atualizarReceita,
+  buscarReceitaFirebase,
+} from "../../services/receitaService";
 
 
 const CATEGORIAS = ["Sobremesas", "Massas", "Saladas", "Lanches"];
@@ -35,7 +41,18 @@ function novoPasso(): Passo {
   return { id: gerarId(), texto: "" };
 }
 
+function extrairMinutos(tempo: string) {
+  const minutos = tempo.match(/(\d+)\s*min/i);
+  if (minutos) return minutos[1];
+  const numero = tempo.match(/\d+/);
+  return numero ? numero[0] : "";
+}
+
 export default function NovaReceita() {
+  const { id: idParam } = useLocalSearchParams<{ id?: string | string[] }>();
+  const receitaId = Array.isArray(idParam) ? idParam[0] : idParam;
+  const editando = Boolean(receitaId);
+
   const [foto, setFoto] = useState<string | null>(null);
   const [titulo, setTitulo] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
@@ -53,6 +70,89 @@ export default function NovaReceita() {
     novoPasso(),
     novoPasso(),
   ]);
+  const [carregandoEdicao, setCarregandoEdicao] = useState(editando);
+  const [salvando, setSalvando] = useState(false);
+
+  function limparFormulario() {
+    setFoto(null);
+    setTitulo("");
+    setCategoria(CATEGORIAS[0]);
+    setTempo("");
+    setPorcoes("");
+    setIngredientes([
+      novoIngrediente(),
+      novoIngrediente(),
+      novoIngrediente(),
+    ]);
+    setPassos([novoPasso(), novoPasso()]);
+  }
+
+  useEffect(() => {
+    if (!receitaId) {
+      limparFormulario();
+      return;
+    }
+
+    let ativo = true;
+    setCarregandoEdicao(true);
+
+    async function carregarReceita() {
+      try {
+        const receita = await buscarReceitaFirebase(receitaId as string);
+
+        if (!ativo) return;
+
+        if (!receita) {
+          Alert.alert(
+            "Receita não encontrada",
+            "Não foi possível abrir essa receita para edição.",
+          );
+          if (router.canGoBack()) router.back();
+          return;
+        }
+
+        setTitulo(receita.titulo);
+        setCategoria(
+          CATEGORIAS.includes(receita.categoria)
+            ? receita.categoria
+            : CATEGORIAS[0],
+        );
+        setTempo(extrairMinutos(receita.tempo));
+        setPorcoes(String(receita.porcoes));
+        setFoto(typeof receita.imagem === "string" ? receita.imagem : null);
+        setIngredientes(
+          receita.ingredientes.length > 0
+            ? receita.ingredientes.map((ingrediente) => ({
+                id: gerarId(),
+                nome: ingrediente.nome,
+                quantidade: ingrediente.quantidade,
+              }))
+            : [novoIngrediente()],
+        );
+        setPassos(
+          receita.passos.length > 0
+            ? receita.passos.map((texto) => ({ id: gerarId(), texto }))
+            : [novoPasso()],
+        );
+      } catch (erro) {
+        console.error("Erro ao carregar receita para edição:", erro);
+        if (!ativo) return;
+        Alert.alert(
+          "Erro ao carregar",
+          "Não foi possível abrir a receita. Verifique sua conexão e as regras do Firestore.",
+        );
+        if (router.canGoBack()) router.back();
+      } finally {
+        if (ativo) setCarregandoEdicao(false);
+      }
+    }
+
+    void carregarReceita();
+
+    return () => {
+      ativo = false;
+    };
+  }, [receitaId]);
 
   async function escolherFoto() {
     const resultado = await ImagePicker.launchImageLibraryAsync({
@@ -170,37 +270,44 @@ async function salvarReceita() {
         quantidade: ing.quantidade.trim(),
       })),
 
-      passos: passosPreenchidos.map((passo) =>
-        passo.texto.trim()
-      ),
+      passos: passosPreenchidos.map((passo) => passo.texto.trim()),
+      ...(foto && /^https?:\/\//.test(foto) ? { imagem: foto } : {}),
     };
 
-    const id = await adicionarReceita(receita);
+    setSalvando(true);
 
-    Alert.alert(
-      "Receita publicada!",
-      `Sua receita foi salva com sucesso. Código: ${id}`
-    );
+    if (editando && receitaId) {
+      await atualizarReceita(receitaId, receita);
+      router.navigate({
+        pathname: "/receita/[id]",
+        params: { id: receitaId },
+      });
+      return;
+    }
 
-    // Limpa o formulário
-    setFoto(null);
-    setTitulo("");
-    setCategoria(CATEGORIAS[0]);
-    setTempo("");
-    setPorcoes("");
-    setIngredientes([novoIngrediente(), novoIngrediente()]);
-    setPassos([novoPasso(), novoPasso()]);
-
+    await adicionarReceita(receita);
+    limparFormulario();
+    router.navigate("/");
   } catch (erro) {
     console.error("Erro ao cadastrar receita:", erro);
 
     Alert.alert(
       "Erro ao salvar",
-      "Não foi possível cadastrar sua receita. Verifique sua conexão e as regras do Firestore."
+      "Não foi possível cadastrar sua receita. Verifique sua conexão e as regras do Firestore.",
     );
+  } finally {
+    setSalvando(false);
   }
 }
 
+
+  if (carregandoEdicao) {
+    return (
+      <SafeAreaView style={styles.carregando} edges={["top"]}>
+        <ActivityIndicator size="large" color="#2F7D4F" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.tela} edges={["top"]}>
@@ -209,7 +316,9 @@ async function salvarReceita() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        <Text style={styles.titulo}>Nova receita</Text>
+        <Text style={styles.titulo}>
+          {editando ? "Editar receita" : "Nova receita"}
+        </Text>
 
         {/* Foto com pré-visualização */}
         <Pressable style={styles.fotoBotao} onPress={escolherFoto}>
@@ -376,8 +485,20 @@ async function salvarReceita() {
         </View>
 
         {/* NOVO: botão salvar */}
-        <Pressable style={styles.botaoSalvar} onPress={salvarReceita}>
-          <Text style={styles.botaoSalvarTexto}>Salvar receita</Text>
+        <Pressable
+          style={[styles.botaoSalvar, salvando && styles.botaoSalvarInativo]}
+          disabled={salvando}
+          onPress={() => {
+            void salvarReceita();
+          }}
+        >
+          <Text style={styles.botaoSalvarTexto}>
+            {salvando
+              ? "Salvando..."
+              : editando
+                ? "Salvar alterações"
+                : "Salvar receita"}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -387,6 +508,12 @@ async function salvarReceita() {
 const styles = StyleSheet.create({
   tela: {
     flex: 1,
+    backgroundColor: "#F7F8F5",
+  },
+  carregando: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#F7F8F5",
   },
   conteudo: {
@@ -577,5 +704,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  botaoSalvarInativo: {
+    opacity: 0.7,
   },
 });

@@ -2,10 +2,12 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 
 import { db } from "../config/firebase";
@@ -46,6 +48,25 @@ export async function listarReceitasFirebase(): Promise<Receita[]> {
         : {}),
     } as Receita;
   });
+}
+
+// Atualizar uma receita já cadastrada no Firebase
+export async function atualizarReceita(
+  id: string,
+  receita: Omit<Receita, "id">,
+): Promise<void> {
+  const { imagem, ...resto } = receita;
+
+  await updateDoc(doc(db, "receitas", id), {
+    ...resto,
+    ...(typeof imagem === "string" ? { imagem } : {}),
+    atualizadoEm: serverTimestamp(),
+  });
+}
+
+// Apagar uma receita cadastrada no Firebase
+export async function apagarReceita(id: string): Promise<void> {
+  await deleteDoc(doc(db, "receitas", id));
 }
 
 // Buscar uma receita específica pelo ID

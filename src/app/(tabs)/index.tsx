@@ -3,7 +3,6 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 
 import type { Receita } from "../../data/receitas";
-import { RECEITAS } from "../../data/receitas";
 import { listarReceitasFirebase } from "../../services/receitaService";
 
 import {
@@ -50,13 +49,7 @@ useFocusEffect(
   }, [])
 );
 
-const todasReceitas = [...RECEITAS, ...receitasFirebase];
-
-  // NOVO: calcula a largura de cada card (2 por linha)
-   // 40 = padding da tela, 12 = espaço entre cards
-
-  // NOVO: filtra as receitas pela categoria e pela busca
-  const receitasFiltradas = todasReceitas.filter((receita) => {
+  const receitasFiltradas = receitasFirebase.filter((receita) => {
   const bateCategoria =
     categoria === "Todas" || receita.categoria === categoria;
 
@@ -66,7 +59,7 @@ const todasReceitas = [...RECEITAS, ...receitasFirebase];
     .toLowerCase()
     .includes(textoBusca);
 
-  const bateIngrediente = receita.ingredientes.some((ingrediente) =>
+  const bateIngrediente = (receita.ingredientes ?? []).some((ingrediente) =>
     ingrediente.nome.toLowerCase().includes(textoBusca)
   );
 

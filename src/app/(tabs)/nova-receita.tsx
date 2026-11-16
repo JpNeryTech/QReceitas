@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { adicionarReceita } from "../../services/receitaService";
+
 
 const CATEGORIAS = ["Sobremesas", "Massas", "Saladas", "Lanches"];
 const TAMANHO_MAXIMO = 5 * 1024 * 1024; // 5 MB
@@ -113,47 +115,92 @@ export default function NovaReceita() {
   }
 
   // NOVO: valida e monta o objeto da receita
-  function salvarReceita() {
-    const ingredientesPreenchidos = ingredientes.filter(
-      (ing) => ing.nome.trim() !== "",
-    );
-    const passosPreenchidos = passos.filter(
-      (passo) => passo.texto.trim() !== "",
-    );
+  
+async function salvarReceita() {
+  const ingredientesPreenchidos = ingredientes.filter(
+    (ing) => ing.nome.trim() !== ""
+  );
 
-    if (titulo.trim() === "") {
-      Alert.alert("Falta o título", "Dê um nome para a receita.");
-      return;
-    }
-    if (ingredientesPreenchidos.length === 0) {
-      Alert.alert("Faltam ingredientes", "Adicione pelo menos um ingrediente.");
-      return;
-    }
-    if (passosPreenchidos.length === 0) {
-      Alert.alert("Falta o modo de preparo", "Escreva pelo menos um passo.");
-      return;
-    }
+  const passosPreenchidos = passos.filter(
+    (passo) => passo.texto.trim() !== ""
+  );
 
-    // Mesmo formato que vai para o Firestore
-    const receita = {
-      titulo: titulo.trim(),
-      categoria,
-      tempoPreparoMin: Number(tempo) || 0,
-      porcoes: Number(porcoes) || 0,
-      ingredientes: ingredientesPreenchidos.map(({ nome, quantidade }) => ({
-        nome: nome.trim(),
-        quantidade: quantidade.trim(),
-      })),
-      passos: passosPreenchidos.map((passo) => passo.texto.trim()),
-      fotoUri: foto, // depois vira fotoUrl, quando subirmos a foto para o Storage
+  if (titulo.trim() === "") {
+    Alert.alert("Falta o título", "Dê um nome para a receita.");
+    return;
+  }
+
+  if (ingredientesPreenchidos.length === 0) {
+    Alert.alert("Faltam ingredientes", "Adicione pelo menos um ingrediente.");
+    return;
+  }
+
+  if (passosPreenchidos.length === 0) {
+    Alert.alert("Falta o modo de preparo", "Escreva pelo menos um passo.");
+    return;
+  }
+
+  if (!tempo || Number(tempo) <= 0) {
+    Alert.alert("Tempo inválido", "Informe o tempo em minutos.");
+    return;
+  }
+
+  if (!porcoes || Number(porcoes) <= 0) {
+    Alert.alert("Porções inválidas", "Informe a quantidade de porções.");
+    return;
+  }
+
+  try {
+    const cores: Record<string, string> = {
+      Sobremesas: "#F3E3C8",
+      Massas: "#F0D9D2",
+      Saladas: "#E2ECD8",
+      Lanches: "#EFE6BF",
     };
 
-    console.log("Receita pronta para salvar:", receita);
+    const receita = {
+      titulo: titulo.trim(),
+      tempo: `${Number(tempo)} min`,
+      porcoes: Number(porcoes),
+      categoria,
+      cor: cores[categoria] ?? "#E2ECD8",
+
+      ingredientes: ingredientesPreenchidos.map((ing) => ({
+        nome: ing.nome.trim(),
+        quantidade: ing.quantidade.trim(),
+      })),
+
+      passos: passosPreenchidos.map((passo) =>
+        passo.texto.trim()
+      ),
+    };
+
+    const id = await adicionarReceita(receita);
+
     Alert.alert(
-      "Receita pronta!",
-      "Os dados estão no formato certo. Falta ligar ao Firebase.",
+      "Receita publicada!",
+      `Sua receita foi salva com sucesso. Código: ${id}`
+    );
+
+    // Limpa o formulário
+    setFoto(null);
+    setTitulo("");
+    setCategoria(CATEGORIAS[0]);
+    setTempo("");
+    setPorcoes("");
+    setIngredientes([novoIngrediente(), novoIngrediente()]);
+    setPassos([novoPasso(), novoPasso()]);
+
+  } catch (erro) {
+    console.error("Erro ao cadastrar receita:", erro);
+
+    Alert.alert(
+      "Erro ao salvar",
+      "Não foi possível cadastrar sua receita. Verifique sua conexão e as regras do Firestore."
     );
   }
+}
+
 
   return (
     <SafeAreaView style={styles.tela} edges={["top"]}>

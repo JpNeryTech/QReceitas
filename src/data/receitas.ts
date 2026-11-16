@@ -20,6 +20,7 @@ export type Receita = {
 export const RECEITAS: Receita[] = [
   {
     id: "1",
+     imagem: "https://commons.wikimedia.org/wiki/Special:FilePath/Bolo_de_Cenoura%2C_08-12-2020.jpg",
     titulo: "Bolo de cenoura",
     tempo: "50 min",
     porcoes: 8,
@@ -63,6 +64,7 @@ export const RECEITAS: Receita[] = [
   },
   {
     id: "3",
+    imagem: "https://commons.wikimedia.org/wiki/Special:FilePath/A_Caesar_salad.jpg",
     titulo: "Salada Caesar",
     tempo: "20 min",
     porcoes: 2,
@@ -82,6 +84,7 @@ export const RECEITAS: Receita[] = [
   },
   {
     id: "4",
+    imagem: "https://commons.wikimedia.org/wiki/Special:FilePath/Brigadeiros_of_Brazil.jpg",
     titulo: "Brigadeiro",
     tempo: "30 min",
     porcoes: 20,
@@ -101,6 +104,7 @@ export const RECEITAS: Receita[] = [
   },
   {
     id: "5",
+     imagem: "https://commons.wikimedia.org/wiki/Special:FilePath/P%C3%A3o_de_Queijo.jpg",
     titulo: "Pão de queijo",
     tempo: "45 min",
     porcoes: 15,
@@ -121,6 +125,7 @@ export const RECEITAS: Receita[] = [
   },
   {
     id: "6",
+    imagem: "https://commons.wikimedia.org/wiki/Special:FilePath/Spaghetti_aglio_e_olio.jpg",
     titulo: "Macarrão alho e óleo",
     tempo: "25 min",
     porcoes: 2,

@@ -1,4 +1,11 @@
-import { useState } from "react";
+import { Image } from "expo-image";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+
+import type { Receita } from "../../data/receitas";
+import { RECEITAS } from "../../data/receitas";
+import { listarReceitasFirebase } from "../../services/receitaService";
+
 import {
   FlatList,
   Pressable,
@@ -6,14 +13,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
-import { Image } from "expo-image";
-import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { RECEITAS } from "../../data/receitas";
 
 const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches"];
 
@@ -21,19 +24,54 @@ export default function Index() {
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("Todas");
 
+  const [receitasFirebase, setReceitasFirebase] = useState<Receita[]>([]);
+
+useFocusEffect(
+  useCallback(() => {
+    let ativo = true;
+
+    async function carregarReceitas() {
+      try {
+        const receitas = await listarReceitasFirebase();
+
+        if (ativo) {
+          setReceitasFirebase(receitas);
+        }
+      } catch (erro) {
+        console.error("Erro ao carregar receitas do Firebase:", erro);
+      }
+    }
+
+    carregarReceitas();
+
+    return () => {
+      ativo = false;
+    };
+  }, [])
+);
+
+const todasReceitas = [...RECEITAS, ...receitasFirebase];
+
   // NOVO: calcula a largura de cada card (2 por linha)
-  const { width } = useWindowDimensions();
-  const larguraCard = (width - 40 - 12) / 2; // 40 = padding da tela, 12 = espaço entre cards
+   // 40 = padding da tela, 12 = espaço entre cards
 
   // NOVO: filtra as receitas pela categoria e pela busca
-  const receitasFiltradas = RECEITAS.filter((receita) => {
-    const bateCategoria =
-      categoria === "Todas" || receita.categoria === categoria;
-    const bateBusca = receita.titulo
-      .toLowerCase()
-      .includes(busca.toLowerCase());
-    return bateCategoria && bateBusca;
-  });
+  const receitasFiltradas = todasReceitas.filter((receita) => {
+  const bateCategoria =
+    categoria === "Todas" || receita.categoria === categoria;
+
+  const textoBusca = busca.trim().toLowerCase();
+
+  const bateTitulo = receita.titulo
+    .toLowerCase()
+    .includes(textoBusca);
+
+  const bateIngrediente = receita.ingredientes.some((ingrediente) =>
+    ingrediente.nome.toLowerCase().includes(textoBusca)
+  );
+
+  return bateCategoria && (bateTitulo || bateIngrediente);
+});
 
   return (
     <SafeAreaView style={styles.tela} edges={["top", "left", "right"]}>
@@ -98,10 +136,9 @@ export default function Index() {
               })
             }
             style={({ pressed }) => [
-              styles.card,
-              { width: larguraCard },
-              pressed && styles.cardPressionado,
-            ]}
+  styles.card,
+  pressed && styles.cardPressionado,
+]}
           >
             <View style={[styles.foto, { backgroundColor: item.cor }]}>
               {item.imagem ? (
@@ -191,12 +228,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E1E5DE",
-    overflow: "hidden",
-  },
+  flex: 1,
+  minWidth: 0,
+  backgroundColor: "#FFFFFF",
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: "#E1E5DE",
+  overflow: "hidden",
+},
   cardPressionado: {
     opacity: 0.85,
   },

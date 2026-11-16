@@ -1,3 +1,6 @@
+# [Prototipo](https://www.figma.com/proto/yuH0etQrpjkDJY703QN6eG/Minhas-receitas?node-id=0-1&t=rDsrK2JztHBCCp8W-1)
+<img width="483" height="500" alt="image" src="https://github.com/user-attachments/assets/798907b4-8814-4c55-b0db-be81e2a538f7" />
+
 # 🍲 QReceitas
 
 Aplicativo mobile para **cadastrar receitas próprias** e **consultar receitas já cadastradas**, com busca simples e visualização completa de ingredientes e modo de preparo.

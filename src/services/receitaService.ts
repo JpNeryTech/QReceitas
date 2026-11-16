@@ -23,6 +23,9 @@ export async function adicionarReceita(
   });
 
   return documento.id;
+
+
+  return documento.id;
 }
 
 // Listar todas as receitas do Firebase

@@ -2,8 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { adicionarReceita } from "../../services/receitaService";
+import { enviarImagemCloudinary } from "../../services/cloudinaryService";
 
 
 const CATEGORIAS = ["Sobremesas", "Massas", "Saladas", "Lanches"];
@@ -35,8 +38,17 @@ function novoPasso(): Passo {
   return { id: gerarId(), texto: "" };
 }
 
+function mostrarMensagem(titulo: string, mensagem: string) {
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined") window.alert(`${titulo}\n\n${mensagem}`);
+  } else {
+    Alert.alert(titulo, mensagem);
+  }
+}
+
 export default function NovaReceita() {
-  const [foto, setFoto] = useState<string | null>(null);
+  const [foto, setFoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [salvando, setSalvando] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [categoria, setCategoria] = useState(CATEGORIAS[0]);
   const [tempo, setTempo] = useState("");
@@ -55,24 +67,31 @@ export default function NovaReceita() {
   ]);
 
   async function escolherFoto() {
-    const resultado = await ImagePicker.launchImageLibraryAsync({
+    if (salvando) return;
+
+    try {
+      const resultado = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7, // reduz o tamanho da imagem
     });
 
-    if (resultado.canceled) return;
+    if (resultado.canceled || !resultado.assets.length) return;
 
     const imagem = resultado.assets[0];
 
     // Validação de tamanho no front
     if (imagem.fileSize && imagem.fileSize > TAMANHO_MAXIMO) {
-      Alert.alert("Foto muito grande", "Escolha uma imagem de até 5 MB.");
+      mostrarMensagem("Foto muito grande", "Escolha uma imagem de até 5 MB.");
       return;
     }
 
-    setFoto(imagem.uri);
+    setFoto(imagem);
+    } catch (erro) {
+      console.error("Erro ao escolher imagem:", erro);
+      mostrarMensagem("Erro", "Não foi possível selecionar a imagem.");
+    }
   }
 
   function atualizarIngrediente(
@@ -114,93 +133,87 @@ export default function NovaReceita() {
     );
   }
 
-  // NOVO: valida e monta o objeto da receita
-  
-async function salvarReceita() {
-  const ingredientesPreenchidos = ingredientes.filter(
-    (ing) => ing.nome.trim() !== ""
-  );
+  // Valida os campos, envia a foto e publica a receita.
+  async function salvarReceita() {
+    if (salvando) return;
 
-  const passosPreenchidos = passos.filter(
-    (passo) => passo.texto.trim() !== ""
-  );
+    const ingredientesPreenchidos = ingredientes
+      .filter((ing) => ing.nome.trim() !== "")
+      .map(({ nome, quantidade }) => ({
+        nome: nome.trim(),
+        quantidade: quantidade.trim(),
+      }));
+    const passosPreenchidos = passos
+      .filter((passo) => passo.texto.trim() !== "")
+      .map((passo) => passo.texto.trim());
 
-  if (titulo.trim() === "") {
-    Alert.alert("Falta o título", "Dê um nome para a receita.");
-    return;
+    if (!titulo.trim()) {
+      mostrarMensagem("Falta o título", "Dê um nome para a receita.");
+      return;
+    }
+    if (!ingredientesPreenchidos.length) {
+      mostrarMensagem("Faltam ingredientes", "Adicione pelo menos um ingrediente.");
+      return;
+    }
+    if (!passosPreenchidos.length) {
+      mostrarMensagem("Falta o modo de preparo", "Escreva pelo menos um passo.");
+      return;
+    }
+
+    const tempoNumero = Number(tempo);
+    const porcoesNumero = Number(porcoes);
+    if (!Number.isInteger(tempoNumero) || tempoNumero <= 0) {
+      mostrarMensagem("Tempo inválido", "Informe o tempo em minutos.");
+      return;
+    }
+    if (!Number.isInteger(porcoesNumero) || porcoesNumero <= 0) {
+      mostrarMensagem("Porções inválidas", "Informe uma quantidade válida.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      // Primeiro envia a foto ao Cloudinary; depois registra a URL no Firestore.
+      const imagemUrl = foto ? await enviarImagemCloudinary(foto) : undefined;
+
+      const cores: Record<string, string> = {
+        Sobremesas: "#F3E3C8",
+        Massas: "#F0D9D2",
+        Saladas: "#E2ECD8",
+        Lanches: "#EFE6BF",
+      };
+
+      const receita = {
+        titulo: titulo.trim(),
+        tempo: `${tempoNumero} min`,
+        porcoes: porcoesNumero,
+        categoria,
+        cor: cores[categoria] ?? "#E2ECD8",
+        ingredientes: ingredientesPreenchidos,
+        passos: passosPreenchidos,
+        ...(imagemUrl ? { imagem: imagemUrl } : {}),
+      };
+
+      const id = await adicionarReceita(receita);
+      setFoto(null);
+      setTitulo("");
+      setCategoria(CATEGORIAS[0]);
+      setTempo("");
+      setPorcoes("");
+      setIngredientes([novoIngrediente(), novoIngrediente(), novoIngrediente()]);
+      setPassos([novoPasso(), novoPasso()]);
+
+      mostrarMensagem("Receita publicada!", `Receita salva com sucesso. Código: ${id}`);
+    } catch (erro) {
+      console.error("Erro ao cadastrar receita:", erro);
+      mostrarMensagem(
+        "Erro ao salvar",
+        erro instanceof Error ? erro.message : "Não foi possível cadastrar a receita."
+      );
+    } finally {
+      setSalvando(false);
+    }
   }
-
-  if (ingredientesPreenchidos.length === 0) {
-    Alert.alert("Faltam ingredientes", "Adicione pelo menos um ingrediente.");
-    return;
-  }
-
-  if (passosPreenchidos.length === 0) {
-    Alert.alert("Falta o modo de preparo", "Escreva pelo menos um passo.");
-    return;
-  }
-
-  if (!tempo || Number(tempo) <= 0) {
-    Alert.alert("Tempo inválido", "Informe o tempo em minutos.");
-    return;
-  }
-
-  if (!porcoes || Number(porcoes) <= 0) {
-    Alert.alert("Porções inválidas", "Informe a quantidade de porções.");
-    return;
-  }
-
-  try {
-    const cores: Record<string, string> = {
-      Sobremesas: "#F3E3C8",
-      Massas: "#F0D9D2",
-      Saladas: "#E2ECD8",
-      Lanches: "#EFE6BF",
-    };
-
-    const receita = {
-      titulo: titulo.trim(),
-      tempo: `${Number(tempo)} min`,
-      porcoes: Number(porcoes),
-      categoria,
-      cor: cores[categoria] ?? "#E2ECD8",
-
-      ingredientes: ingredientesPreenchidos.map((ing) => ({
-        nome: ing.nome.trim(),
-        quantidade: ing.quantidade.trim(),
-      })),
-
-      passos: passosPreenchidos.map((passo) =>
-        passo.texto.trim()
-      ),
-    };
-
-    const id = await adicionarReceita(receita);
-
-    Alert.alert(
-      "Receita publicada!",
-      `Sua receita foi salva com sucesso. Código: ${id}`
-    );
-
-    // Limpa o formulário
-    setFoto(null);
-    setTitulo("");
-    setCategoria(CATEGORIAS[0]);
-    setTempo("");
-    setPorcoes("");
-    setIngredientes([novoIngrediente(), novoIngrediente()]);
-    setPassos([novoPasso(), novoPasso()]);
-
-  } catch (erro) {
-    console.error("Erro ao cadastrar receita:", erro);
-
-    Alert.alert(
-      "Erro ao salvar",
-      "Não foi possível cadastrar sua receita. Verifique sua conexão e as regras do Firestore."
-    );
-  }
-}
-
 
   return (
     <SafeAreaView style={styles.tela} edges={["top"]}>
@@ -212,10 +225,10 @@ async function salvarReceita() {
         <Text style={styles.titulo}>Nova receita</Text>
 
         {/* Foto com pré-visualização */}
-        <Pressable style={styles.fotoBotao} onPress={escolherFoto}>
+        <Pressable style={styles.fotoBotao} onPress={escolherFoto} disabled={salvando}>
           {foto ? (
             <>
-              <Image source={{ uri: foto }} style={styles.fotoImagem} />
+              <Image source={{ uri: foto.uri }} style={styles.fotoImagem} />
               <View style={styles.fotoTrocar}>
                 <Text style={styles.fotoTrocarTexto}>Trocar foto</Text>
               </View>
@@ -252,6 +265,7 @@ async function salvarReceita() {
                 <Pressable
                   key={item}
                   onPress={() => setCategoria(item)}
+                  disabled={salvando}
                   style={[styles.chip, selecionada && styles.chipSelecionado]}
                 >
                   <Text
@@ -322,6 +336,7 @@ async function salvarReceita() {
               <Pressable
                 style={styles.remover}
                 onPress={() => removerIngrediente(ing.id)}
+                disabled={salvando}
                 accessibilityLabel={`Remover ingrediente ${indice + 1}`}
               >
                 <Ionicons name="trash-outline" size={22} color="#5C655E" />
@@ -358,10 +373,12 @@ async function salvarReceita() {
                 textAlignVertical="top"
                 value={passo.texto}
                 onChangeText={(texto) => atualizarPasso(passo.id, texto)}
+                editable={!salvando}
               />
               <Pressable
                 style={styles.remover}
                 onPress={() => removerPasso(passo.id)}
+                disabled={salvando}
                 accessibilityLabel={`Remover passo ${indice + 1}`}
               >
                 <Ionicons name="trash-outline" size={22} color="#5C655E" />
@@ -369,15 +386,22 @@ async function salvarReceita() {
             </View>
           ))}
 
-          <Pressable style={styles.botaoSecundario} onPress={adicionarPasso}>
+          <Pressable style={styles.botaoSecundario} onPress={adicionarPasso} disabled={salvando}>
             <Ionicons name="add" size={18} color="#2F7D4F" />
             <Text style={styles.botaoSecundarioTexto}>Adicionar passo</Text>
           </Pressable>
         </View>
 
         {/* NOVO: botão salvar */}
-        <Pressable style={styles.botaoSalvar} onPress={salvarReceita}>
-          <Text style={styles.botaoSalvarTexto}>Salvar receita</Text>
+        <Pressable
+          style={[styles.botaoSalvar, salvando && styles.botaoDesativado]}
+          onPress={salvarReceita}
+          disabled={salvando}
+        >
+          {salvando && <ActivityIndicator size="small" color="#FFFFFF" />}
+          <Text style={styles.botaoSalvarTexto}>
+            {salvando ? "Publicando receita..." : "Salvar receita"}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -567,11 +591,16 @@ const styles = StyleSheet.create({
     color: "#1B1F1C",
   },
   botaoSalvar: {
+    flexDirection: "row",
+    gap: 10,
     height: 52,
     borderRadius: 14,
     backgroundColor: "#2F7D4F",
     alignItems: "center",
     justifyContent: "center",
+  },
+  botaoDesativado: {
+    opacity: 0.6,
   },
   botaoSalvarTexto: {
     fontSize: 16,

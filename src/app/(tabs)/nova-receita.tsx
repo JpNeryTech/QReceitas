@@ -23,9 +23,10 @@ import {
   buscarReceitaFirebase,
 } from "../../services/receitaService";
 import { enviarImagemCloudinary } from "../../services/cloudinaryService";
+import { ModalConfirmacao } from "../../components/modal-confirmacao";
 
 
-const CATEGORIAS = ["Sobremesas", "Massas", "Saladas", "Lanches"];
+const CATEGORIAS = ["Sobremesas", "Massas", "Saladas", "Lanches", "Prato feito"];
 const TAMANHO_MAXIMO = 5 * 1024 * 1024; // 5 MB
 
 type Ingrediente = { id: string; nome: string; quantidade: string };
@@ -69,6 +70,7 @@ export default function NovaReceita() {
   const [fotoSalva, setFotoSalva] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [carregandoEdicao, setCarregandoEdicao] = useState(editando);
+  const [confirmarAberto, setConfirmarAberto] = useState(false);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   function subirCampo(evento: TextInputFocusEvent) {
@@ -246,6 +248,40 @@ export default function NovaReceita() {
     );
   }
 
+  function formularioValido() {
+    if (!titulo.trim()) {
+      mostrarMensagem("Falta o título", "Dê um nome para a receita.");
+      return false;
+    }
+    if (!ingredientes.some((ing) => ing.nome.trim() !== "")) {
+      mostrarMensagem("Faltam ingredientes", "Adicione pelo menos um ingrediente.");
+      return false;
+    }
+    if (!passos.some((passo) => passo.texto.trim() !== "")) {
+      mostrarMensagem("Falta o modo de preparo", "Escreva pelo menos um passo.");
+      return false;
+    }
+
+    const tempoNumero = Number(tempo);
+    const porcoesNumero = Number(porcoes);
+    if (!Number.isInteger(tempoNumero) || tempoNumero <= 0) {
+      mostrarMensagem("Tempo inválido", "Informe o tempo em minutos.");
+      return false;
+    }
+    if (!Number.isInteger(porcoesNumero) || porcoesNumero <= 0) {
+      mostrarMensagem("Porções inválidas", "Informe uma quantidade válida.");
+      return false;
+    }
+
+    return true;
+  }
+
+  function pedirConfirmacao() {
+    if (salvando) return;
+    if (!formularioValido()) return;
+    setConfirmarAberto(true);
+  }
+
   // Valida os campos, envia a foto e publica a receita.
   async function salvarReceita() {
     if (salvando) return;
@@ -260,30 +296,22 @@ export default function NovaReceita() {
       .filter((passo) => passo.texto.trim() !== "")
       .map((passo) => passo.texto.trim());
 
-    if (!titulo.trim()) {
-      mostrarMensagem("Falta o título", "Dê um nome para a receita.");
-      return;
-    }
-    if (!ingredientesPreenchidos.length) {
-      mostrarMensagem("Faltam ingredientes", "Adicione pelo menos um ingrediente.");
-      return;
-    }
-    if (!passosPreenchidos.length) {
-      mostrarMensagem("Falta o modo de preparo", "Escreva pelo menos um passo.");
+    if (!ingredientesPreenchidos.length || !passosPreenchidos.length) {
       return;
     }
 
     const tempoNumero = Number(tempo);
     const porcoesNumero = Number(porcoes);
-    if (!Number.isInteger(tempoNumero) || tempoNumero <= 0) {
-      mostrarMensagem("Tempo inválido", "Informe o tempo em minutos.");
-      return;
-    }
-    if (!Number.isInteger(porcoesNumero) || porcoesNumero <= 0) {
-      mostrarMensagem("Porções inválidas", "Informe uma quantidade válida.");
+    if (
+      !Number.isInteger(tempoNumero) ||
+      tempoNumero <= 0 ||
+      !Number.isInteger(porcoesNumero) ||
+      porcoesNumero <= 0
+    ) {
       return;
     }
 
+    setConfirmarAberto(false);
     setSalvando(true);
     try {
       // Foto nova sobe para o Cloudinary. Na edição, a URL já salva permanece.
@@ -296,6 +324,7 @@ export default function NovaReceita() {
         Massas: "#F0D9D2",
         Saladas: "#E2ECD8",
         Lanches: "#EFE6BF",
+        "Prato feito": "#F6D5C2",
       };
 
       const receita = {
@@ -534,7 +563,7 @@ export default function NovaReceita() {
         {/* NOVO: botão salvar */}
         <Pressable
           style={[styles.botaoSalvar, salvando && styles.botaoDesativado]}
-          onPress={salvarReceita}
+          onPress={pedirConfirmacao}
           disabled={salvando}
         >
           {salvando && <ActivityIndicator size="small" color="#FFFFFF" />}
@@ -548,6 +577,21 @@ export default function NovaReceita() {
         </Pressable>
       </ScrollView>
       </KeyboardAvoidingView>
+      <ModalConfirmacao
+        visivel={confirmarAberto}
+        titulo={editando ? "Salvar alterações" : "Publicar receita"}
+        mensagem={
+          editando
+            ? `Deseja salvar as alterações em "${titulo.trim()}"?`
+            : `Deseja publicar "${titulo.trim()}"?`
+        }
+        textoConfirmar={editando ? "Salvar" : "Publicar"}
+        carregando={salvando}
+        onCancelar={() => setConfirmarAberto(false)}
+        onConfirmar={() => {
+          void salvarReceita();
+        }}
+      />
     </SafeAreaView>
   );
 }

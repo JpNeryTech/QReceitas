@@ -23,6 +23,7 @@ import {
   apagarReceita,
   buscarReceitaFirebase,
 } from "../../services/receitaService";
+import { ModalConfirmacao } from "../../components/modal-confirmacao";
 
 // CORES
 const COR_TEXTO = "#1B1F1C";
@@ -60,6 +61,7 @@ export default function Receita() {
   } | null>(null);
 
   const [apagando, setApagando] = useState(false);
+  const [confirmarAberto, setConfirmarAberto] = useState(false);
 
   // Recarrega ao voltar da edição.
   useFocusEffect(
@@ -130,20 +132,7 @@ export default function Receita() {
       return;
     }
 
-    Alert.alert(
-      "Apagar receita",
-      `Deseja apagar "${receita.titulo}"? Essa ação não pode ser desfeita.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Deletar",
-          style: "destructive",
-          onPress: () => {
-            void excluirReceita(id);
-          },
-        },
-      ],
-    );
+    setConfirmarAberto(true);
   }
 
   async function excluirReceita(receitaId: string) {
@@ -419,6 +408,18 @@ export default function Receita() {
           </View>
         </View>
       </ScrollView>
+      <ModalConfirmacao
+        visivel={confirmarAberto}
+        titulo="Apagar receita"
+        mensagem={`Deseja apagar "${receita.titulo}"? Essa ação não pode ser desfeita.`}
+        textoConfirmar="Deletar"
+        destrutivo
+        carregando={apagando}
+        onCancelar={() => setConfirmarAberto(false)}
+        onConfirmar={() => {
+          if (typeof id === "string") void excluirReceita(id);
+        }}
+      />
     </View>
   );
 }

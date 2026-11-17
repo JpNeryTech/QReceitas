@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 
-const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches"];
+const CATEGORIAS = ["Todas", "Sobremesas", "Massas", "Saladas", "Lanches", "Prato feito"];
 
 export default function Index() {
   const [busca, setBusca] = useState("");
